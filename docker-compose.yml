@@ -1,0 +1,56 @@
+version: "3.7"
+services:
+  logstash:
+    image: logstash:7.16.3
+    hostname: "logstash"
+    container_name: "logstash"
+    user: root
+    volumes:
+      - "./data:/data:rw"
+      - "./conf/logstash/conf:/pipelines"
+      - "./conf/logstash/pipelines.yml:/usr/share/logstash/config/pipelines.yml"
+  es01:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.4.0
+    container_name: es01
+    restart: always    
+    environment:
+      - node.name=es01
+      - cluster.name=es-docker-prueba
+      #- cluster.initial_master_nodes=es01
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - ./data01:/usr/share/elasticsearch/data
+    ports:
+      - 9200:9200
+  auditbeat:
+    image: docker.elastic.co/beats/auditbeat:8.3.3
+   # https://github.com/docker/swarmkit/issues/1951
+    hostname: "auditbeat"
+    container_name: "auditbeat"
+   # Need to override user so we can access the log files, and docker.sock
+    user: root
+   # https://www.elastic.co/guide/en/beats/auditbeat/current/running-on-docker.html#_special_requirements
+   # PID and CAP_ADD options are ignored as they are Not yet available in swarm mode at the moment.
+   # Eagerly waiting for Docker 19.06 release which will bring --privileged flag to Docker
+   # Swarm Mode https://github.com/moby/moby/issues/24862#issuecomment-451594187
+   # support for capabilities https://github.com/moby/moby/pull/38380
+    pid: host
+    cap_add:
+      - AUDIT_CONTROL
+      - AUDIT_READ
+    volumes:
+      - "./data:/data:rw"
+         #- /var/log:/var/log:ro
+       #environment:
+         #- ELASTICSEARCH_HOST=${ELASTICSEARCH_HOST:-node1}
+         #- KIBANA_HOST=${KIBANA_HOST:-node1}
+         #- ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME:-elastic}
+         #- ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD:-changeme}
+    command: ["--strict.perms=false"]
+    #deploy:
+    #mode: global
